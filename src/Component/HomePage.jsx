@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Dialog,
   Menu,
   MenuItem,
   Pagination,
@@ -11,11 +12,13 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ReactComponent as LogoMain } from "./svg/logo.svg";
 import { ReactComponent as FilterIcon } from "./svg/filter-icon.svg";
 import { ReactComponent as DownArrow } from "./svg/down-arrow.svg";
 import { ReactComponent as CalenderIcon } from "./svg/calender-icon.svg";
+import DesktopDialog from "./DesktopDialog";
+import { useSearchParams } from "react-router-dom";
 
 const spacexTableHeader = [
   "No.",
@@ -37,9 +40,28 @@ const spacexTableData = [
   "Rocket",
 ];
 
+const filterMenuOption = [
+  "All Launches",
+  "Upcoming Launches",
+  "Successful Launches",
+  "Failed Launches",
+];
 const HomePage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [anchorEl, setAnchorEl] = useState(null);
   const [anchorEl2, setAnchorEl2] = useState(null);
+  const [currentDataPage, setCurrentDataPage] = useState(1);
+  const [allLaunchData, setAllLaunchData] = useState([]);
+  const [tableViewData, setTableViewData] = useState([]);
+  const [totalDataPage, setTotalDataPage] = useState(1);
+  const filterStatus = searchParams.get("selectedFilter");
+  const [selectedFilterOption, setSelectedFilterOption] = useState(
+    filterStatus ? filterStatus : "All Launches"
+  );
+
+  const perPageLimit = 12;
+  const [users, setUsers] = useState([]);
+  const [openDialog, setOpenDialog] = useState(false);
   const open = Boolean(anchorEl);
   const open2 = Boolean(anchorEl2);
   const handleClick = (event) => {
@@ -54,8 +76,153 @@ const HomePage = () => {
   const handleClose2 = () => {
     setAnchorEl2(null);
   };
+  const optionsForDate = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+    timeZone: "UTC",
+  };
+  useEffect(() => {
+    getSpaceXData();
+    setSearchParams({
+      selectedFilter: filterStatus ? filterStatus : "All Launches",
+    });
+  }, []);
+
+  const getSpaceXData = async () => {
+    await fetch("https://api.spacexdata.com/v3/launches")
+      .then((response) => {
+        return response.json();
+      })
+      .then((data) => {
+        if (data?.length > 0) {
+          setAllLaunchData(data);
+          setTotalDataPage(Math.ceil(Number(data?.length) / perPageLimit));
+        }
+        setUsers(data);
+      });
+  };
+
+  useEffect(() => {
+    if (allLaunchData && allLaunchData?.length > 0) {
+      displayItems(currentDataPage, allLaunchData);
+    }
+  }, [currentDataPage, allLaunchData]);
+
+  useEffect(() => {
+    if (filterStatus && allLaunchData) {
+      if (filterStatus === "Upcoming Launches") {
+        let allDataFilter = allLaunchData?.filter(
+          (data, index) => data?.upcoming === true
+        );
+        setTotalDataPage(
+          Math.ceil(Number(allDataFilter?.length) / perPageLimit)
+        );
+        if (
+          currentDataPage >
+          Math.ceil(Number(allDataFilter?.length) / perPageLimit)
+        ) {
+          displayItems(1, allDataFilter);
+        } else {
+          displayItems(currentDataPage, allDataFilter);
+        }
+      }
+      if (filterStatus === "Successful Launches") {
+        let allDataFilter = allLaunchData?.filter(
+          (data, index) => data?.launch_success === true
+        );
+        setTotalDataPage(
+          Math.ceil(Number(allDataFilter?.length) / perPageLimit)
+        );
+        if (
+          currentDataPage >
+          Math.ceil(Number(allDataFilter?.length) / perPageLimit)
+        ) {
+          displayItems(1, allDataFilter);
+        } else {
+          displayItems(currentDataPage, allDataFilter);
+        }
+      }
+      if (filterStatus === "Failed Launches") {
+        let allDataFilter = allLaunchData?.filter(
+          (data, index) => data?.launch_success === false
+        );
+        setTotalDataPage(
+          Math.ceil(Number(allDataFilter?.length) / perPageLimit)
+        );
+        if (
+          currentDataPage >
+          Math.ceil(Number(allDataFilter?.length) / perPageLimit)
+        ) {
+          displayItems(1, allDataFilter);
+        } else {
+          displayItems(currentDataPage, allDataFilter);
+        }
+      }
+      if (filterStatus === "All Launches") {
+        setTotalDataPage(
+          Math.ceil(Number(allLaunchData?.length) / perPageLimit)
+        );
+        displayItems(currentDataPage, allLaunchData);
+      }
+    }
+  }, [filterStatus, allLaunchData, currentDataPage]);
+
+  console.log(totalDataPage, "totalDataPagetotalDataPagetotalDataPage");
+  console.log(currentDataPage, "currentDataPagecurrentDataPagecurrentDataPage");
+  const handleChangePage = (event, page) => {
+    setCurrentDataPage(page);
+  };
+  function displayItems(pageNumber, items) {
+    const startIndex = (pageNumber - 1) * perPageLimit;
+    const endIndex = startIndex + perPageLimit;
+    const itemsToShow = items.slice(startIndex, endIndex);
+    setTableViewData(itemsToShow);
+  }
+  const handleSelectFilter = (data) => {
+    setSelectedFilterOption(data);
+    setSearchParams({ selectedFilter: data });
+    setAnchorEl2(null);
+  };
+  const getLaucnhStateChip = (launchStatus, upComing) => {
+    return (
+      <Typography
+        component="span"
+        sx={{
+          fontWeight: "600",
+          borderRadius: "15px",
+          backgroundColor:
+            upComing === true
+              ? "#FEF3C7"
+              : launchStatus === true
+              ? "#DEF7EC"
+              : "#FDE2E1",
+          color:
+            upComing === true
+              ? "#92400F"
+              : launchStatus === true
+              ? "#03543F"
+              : "#981B1C",
+          padding: "0.3rem 1rem",
+        }}
+      >
+        {upComing === true
+          ? "Upcoming"
+          : launchStatus === true
+          ? "Success"
+          : "Failed"}
+      </Typography>
+    );
+  };
   return (
     <div>
+      <DesktopDialog
+        openDialog={openDialog}
+        closeDialog={() => setOpenDialog(false)}
+      />
       <Box
         sx={{
           padding: "20px 0",
@@ -131,7 +298,9 @@ const HomePage = () => {
               }}
             >
               <FilterIcon width="1rem" height="1rem" />
-              <span style={{ margin: "0px 5px 0px 10px" }}>All Launches</span>
+              <span style={{ margin: "0px 5px 0px 10px" }}>
+                {selectedFilterOption}
+              </span>
               <DownArrow width="1rem" height="1rem" />
             </Typography>
             <Menu
@@ -143,9 +312,18 @@ const HomePage = () => {
                 "aria-labelledby": "basic-button-right",
               }}
             >
-              <MenuItem onClick={handleClose}>Profile</MenuItem>
-              <MenuItem onClick={handleClose}>My account</MenuItem>
-              <MenuItem onClick={handleClose}>Logout</MenuItem>
+              {filterMenuOption.map((data, index) => {
+                return (
+                  <MenuItem
+                    value={data}
+                    key={index}
+                    selected={data === selectedFilterOption}
+                    onClick={() => handleSelectFilter(data)}
+                  >
+                    {data}
+                  </MenuItem>
+                );
+              })}
             </Menu>
           </Box>
         </Box>
@@ -178,164 +356,87 @@ const HomePage = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            <TableRow>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  01
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  24 March 2006 at 22:30
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Atoll
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Falcon
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  LEO
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Failed
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Falcon 9
-                </Typography>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  01
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  24 March 2006 at 22:30
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Atoll
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Falcon
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  LEO
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Failed
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-              >
-                <Typography
-                  component="div"
-                  color="inherit"
-                  sx={{ fontWeight: "500" }}
-                >
-                  Falcon 9
-                </Typography>
-              </TableCell>
-            </TableRow>
+            {tableViewData &&
+              tableViewData?.map((data, index) => {
+                return (
+                  <TableRow onClick={() => setOpenDialog(true)} key={index}>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      <Typography
+                        component="div"
+                        color="inherit"
+                        sx={{ fontWeight: "500" }}
+                      >
+                        {data?.flight_number}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      <Typography
+                        component="div"
+                        color="inherit"
+                        sx={{ fontWeight: "500" }}
+                      >
+                        {new Intl.DateTimeFormat(
+                          "en-GB",
+                          optionsForDate
+                        ).format(new Date(data?.launch_date_utc))}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      <Typography
+                        component="div"
+                        color="inherit"
+                        sx={{ fontWeight: "500" }}
+                      >
+                        {data?.launch_site?.site_name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      <Typography
+                        component="div"
+                        color="inherit"
+                        sx={{ fontWeight: "500" }}
+                      >
+                        {data?.mission_name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      <Typography
+                        component="div"
+                        color="inherit"
+                        sx={{ fontWeight: "500" }}
+                      >
+                        {data?.rocket?.second_stage?.payloads[0]?.orbit}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      {getLaucnhStateChip(data?.launch_success, data?.upcoming)}
+                    </TableCell>
+                    <TableCell
+                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                    >
+                      <Typography
+                        component="div"
+                        color="inherit"
+                        sx={{ fontWeight: "500" }}
+                      >
+                        Falcon 9
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
         <Box
@@ -345,7 +446,14 @@ const HomePage = () => {
             justifyContent: "flex-end",
           }}
         >
-          <Pagination count={10} variant="outlined" shape="rounded" />
+          <Pagination
+            count={totalDataPage}
+            variant="outlined"
+            page={currentDataPage}
+            shape="rounded"
+            defaultPage={1}
+            onChange={handleChangePage}
+          />
         </Box>
       </Box>
     </div>
