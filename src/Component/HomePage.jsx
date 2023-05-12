@@ -19,6 +19,7 @@ import { ReactComponent as DownArrow } from "./svg/down-arrow.svg";
 import { ReactComponent as CalenderIcon } from "./svg/calender-icon.svg";
 import DesktopDialog from "./DesktopDialog";
 import { useSearchParams } from "react-router-dom";
+import Loader from "./Loader";
 
 const spacexTableHeader = [
   "No.",
@@ -45,14 +46,17 @@ const filterMenuOption = [
   "Upcoming Launches",
   "Successful Launches",
   "Failed Launches",
+  "Zero Options",
 ];
 const HomePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [loadingState, setLoadingState] = useState(false);
   const [anchorEl2, setAnchorEl2] = useState(null);
   const [currentDataPage, setCurrentDataPage] = useState(1);
   const [allLaunchData, setAllLaunchData] = useState([]);
   const [tableViewData, setTableViewData] = useState([]);
+  const [selectedModalValues, setSelectedModalValues] = useState({});
   const [totalDataPage, setTotalDataPage] = useState(1);
   const filterStatus = searchParams.get("selectedFilter");
   const [selectedFilterOption, setSelectedFilterOption] = useState(
@@ -93,6 +97,7 @@ const HomePage = () => {
   }, []);
 
   const getSpaceXData = async () => {
+    setLoadingState(true);
     await fetch("https://api.spacexdata.com/v3/launches")
       .then((response) => {
         return response.json();
@@ -104,6 +109,7 @@ const HomePage = () => {
         }
         setUsers(data);
       });
+    setLoadingState(false);
   };
 
   useEffect(() => {
@@ -113,6 +119,7 @@ const HomePage = () => {
   }, [currentDataPage, allLaunchData]);
 
   useEffect(() => {
+    setLoadingState(true);
     if (filterStatus && allLaunchData) {
       if (filterStatus === "Upcoming Launches") {
         let allDataFilter = allLaunchData?.filter(
@@ -168,11 +175,13 @@ const HomePage = () => {
         );
         displayItems(currentDataPage, allLaunchData);
       }
+      if (filterStatus === "Zero Options") {
+        setTotalDataPage(0);
+        displayItems(currentDataPage, []);
+      }
     }
+    setLoadingState(false);
   }, [filterStatus, allLaunchData, currentDataPage]);
-
-  console.log(totalDataPage, "totalDataPagetotalDataPagetotalDataPage");
-  console.log(currentDataPage, "currentDataPagecurrentDataPagecurrentDataPage");
   const handleChangePage = (event, page) => {
     setCurrentDataPage(page);
   };
@@ -222,6 +231,7 @@ const HomePage = () => {
       <DesktopDialog
         openDialog={openDialog}
         closeDialog={() => setOpenDialog(false)}
+        selectedModalValues={selectedModalValues}
       />
       <Box
         sx={{
@@ -254,10 +264,6 @@ const HomePage = () => {
           <Box>
             <Typography
               id="basic-button"
-              aria-controls={open ? "basic-menu" : undefined}
-              aria-haspopup="true"
-              aria-expanded={open ? "true" : undefined}
-              onClick={handleClick}
               sx={{
                 fontSize: "1rem",
                 fontWeight: "500",
@@ -269,19 +275,6 @@ const HomePage = () => {
               <span style={{ margin: "0px 5px 0px 10px" }}>Last 6 Months</span>
               <DownArrow width="1rem" height="1rem" />
             </Typography>
-            <Menu
-              id="basic-menu"
-              anchorEl={anchorEl}
-              open={open}
-              onClose={handleClose}
-              MenuListProps={{
-                "aria-labelledby": "basic-button",
-              }}
-            >
-              <MenuItem onClick={handleClose}>Profile</MenuItem>
-              <MenuItem onClick={handleClose}>My account</MenuItem>
-              <MenuItem onClick={handleClose}>Logout</MenuItem>
-            </Menu>
           </Box>
           <Box>
             <Typography
@@ -295,6 +288,7 @@ const HomePage = () => {
                 fontWeight: "500",
                 display: "flex",
                 alignItems: "center",
+                cursor: "pointer",
               }}
             >
               <FilterIcon width="1rem" height="1rem" />
@@ -355,89 +349,124 @@ const HomePage = () => {
               })}
             </TableRow>
           </TableHead>
-          <TableBody>
-            {tableViewData &&
-              tableViewData?.map((data, index) => {
-                return (
-                  <TableRow onClick={() => setOpenDialog(true)} key={index}>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+          {tableViewData && tableViewData?.length > 0 ? (
+            <TableBody>
+              {tableViewData &&
+                tableViewData?.map((data, index) => {
+                  return (
+                    <TableRow
+                      onClick={() => {
+                        setOpenDialog(true);
+                        setSelectedModalValues(data);
+                      }}
+                      sx={{ cursor: "pointer" }}
+                      key={index}
                     >
-                      <Typography
-                        component="div"
-                        color="inherit"
-                        sx={{ fontWeight: "500" }}
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
                       >
-                        {data?.flight_number}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-                    >
-                      <Typography
-                        component="div"
-                        color="inherit"
-                        sx={{ fontWeight: "500" }}
+                        <Typography
+                          component="div"
+                          color="inherit"
+                          sx={{ fontWeight: "500" }}
+                        >
+                          {data?.flight_number}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
                       >
-                        {new Intl.DateTimeFormat(
-                          "en-GB",
-                          optionsForDate
-                        ).format(new Date(data?.launch_date_utc))}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-                    >
-                      <Typography
-                        component="div"
-                        color="inherit"
-                        sx={{ fontWeight: "500" }}
+                        <Typography
+                          component="div"
+                          color="inherit"
+                          sx={{ fontWeight: "500" }}
+                        >
+                          {new Intl.DateTimeFormat(
+                            "en-GB",
+                            optionsForDate
+                          ).format(new Date(data?.launch_date_utc))}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
                       >
-                        {data?.launch_site?.site_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-                    >
-                      <Typography
-                        component="div"
-                        color="inherit"
-                        sx={{ fontWeight: "500" }}
+                        <Typography
+                          component="div"
+                          color="inherit"
+                          sx={{ fontWeight: "500" }}
+                        >
+                          {data?.launch_site?.site_name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
                       >
-                        {data?.mission_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-                    >
-                      <Typography
-                        component="div"
-                        color="inherit"
-                        sx={{ fontWeight: "500" }}
+                        <Typography
+                          component="div"
+                          color="inherit"
+                          sx={{ fontWeight: "500" }}
+                        >
+                          {data?.mission_name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
                       >
-                        {data?.rocket?.second_stage?.payloads[0]?.orbit}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-                    >
-                      {getLaucnhStateChip(data?.launch_success, data?.upcoming)}
-                    </TableCell>
-                    <TableCell
-                      sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
-                    >
-                      <Typography
-                        component="div"
-                        color="inherit"
-                        sx={{ fontWeight: "500" }}
+                        <Typography
+                          component="div"
+                          color="inherit"
+                          sx={{ fontWeight: "500" }}
+                        >
+                          {data?.rocket?.second_stage?.payloads[0]?.orbit}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
                       >
-                        Falcon 9
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-          </TableBody>
+                        {getLaucnhStateChip(
+                          data?.launch_success,
+                          data?.upcoming
+                        )}
+                      </TableCell>
+                      <TableCell
+                        sx={{ padding: "1.2rem 1.5rem", borderBottom: "none" }}
+                      >
+                        <Typography
+                          component="div"
+                          color="inherit"
+                          sx={{ fontWeight: "500" }}
+                        >
+                          Falcon 9
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+            </TableBody>
+          ) : (
+            <TableBody>
+              <TableRow sx={{ textAlign: "center" }}>
+                <TableCell colSpan="7">
+                  <Typography
+                    component="div"
+                    color="inherit"
+                    sx={{
+                      fontWeight: "500",
+                      padding: "3rem 0rem 20rem",
+                      textAlign: "center",
+                      columnSpan: "7",
+                    }}
+                  >
+                    {loadingState ? (
+                      <Loader />
+                    ) : (
+                      "No Result Found for the specified filter"
+                    )}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          )}
         </Table>
         <Box
           sx={{
